@@ -10,7 +10,8 @@ def main():
     # Load datasets - cleaned and merged into one
     df: DataFrame = utils.load_datasets(clean=True, merge=True, merge_how='inner')
     df = df.dropna()
-    df = df.sample(200000)
+    # Remove outliers (temperature range outside [-40 - 125] +- error_margin
+    #df = df.sample(200000)
     # Print quantities
     print(utils.n_unique_get(df))
 
@@ -28,8 +29,6 @@ def main():
     # Standardize the data
     standard_scaler = StandardScaler()
     scaled_features = standard_scaler.fit_transform(df[features])
-
-    # Remove outliers (temperature range outside [-40 - 125] +- error_margin
 
     sns.pairplot(df[features], hue='branch_id', palette='viridis')
     plt.suptitle("Pair plot of raw data", y=1.02)
