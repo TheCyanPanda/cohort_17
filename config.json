@@ -1,5 +1,5 @@
 {
-  "default_path": "/repo/ehrlcuj/cohort_17",
+  "default_path": "../Project_5_Temp_Sensors",
   "dataset_file_names": [
         "dataset_1_radioTemperatures_20210303.csv",
         "dataset_2_powerClass_20210303.csv",

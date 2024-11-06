@@ -1,3 +1,4 @@
+from __future__ import annotations
 import pandas as pd
 from pandas.core.frame import DataFrame as DataFrame
 from typing import Any
