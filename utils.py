@@ -113,11 +113,31 @@ def load_datasets(base_path: str = script_config.default_path,
         dfs[1] = dfs[1].drop(columns=['field'])
 
     if merge:
-        df_merged: DataFrame = pd.merge(dfs[0], dfs[1], on='id_audit', how=merge_how)
-        df_merged = pd.merge(df_merged, dfs[2], on='id_audit', how=merge_how)
+        for d in dfs:
+            d.set_index('id_audit')
+        df_merged: DataFrame = dfs[0].combine_first(dfs[1]).combine_first(dfs[2])
         return df_merged
 
     return dfs
+
+
+def remove_outliers_range(
+    df: pd.DataFrame,
+    column: str,
+    limits: tuple[int | float, int | float]
+) -> pd.DataFrame:
+    """
+    Remove any rows from dataframe that is outside specified range for a given column
+    Args:
+        df: Target dataframe
+        column: Name of column
+        limits: Tuple with elements [start, stop] (inclusive)
+
+    Returns:
+        The cleaned dataframe
+    """
+    start, stop = limits
+    return df[(df[column] >= start) & (df[column] <= stop)]
 
 
 # Set outliers to None for all numerical columns in the DataFrame
