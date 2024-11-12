@@ -80,7 +80,7 @@ def load_datasets(base_path: str = script_config.default_path,
                   script_config_: ScriptConfig = script_config,
                   clean: bool = False,
                   merge: bool = False,
-                  merge_how: str = 'outer') -> list[DataFrame] | DataFrame:
+) -> list[DataFrame] | DataFrame:
     """
     Loads the datasets given by the configuration
     Args:
@@ -93,12 +93,15 @@ def load_datasets(base_path: str = script_config.default_path,
     """
     dfs: list[DataFrame] = []
     for df in script_config_.dataset_file_names:
-        dfs.append(pd.read_csv(f"{base_path}/{df}", delimiter=";"))
+        _df: DataFrame = pd.read_csv(f"{base_path}/{df}", delimiter=";")
+        dfs.append(_df)
 
     if clean:
         # Clean up column names
         dfs[0] = dfs[0].rename(columns={'field': 'sensor',
                                         'value': 'temperature'})
+        # Clean up sensor values (Keep only what's contained within the underscores)
+        dfs[0]['sensor'] = dfs[0]['sensor'].str.extract(r'_(.*?)_')
 
         # Extract powerclass (W/dBm) from single column
         dfs[1]['power_dbm'] = dfs[1]["value"].str.extract(r"\[(\d+\.\d+) dBm\]").astype(float)
@@ -106,11 +109,11 @@ def load_datasets(base_path: str = script_config.default_path,
         dfs[1] = dfs[1].drop(columns=['value'])
 
         # Remove any rows in 'unit' column != C
-        dfs[0] = filter_df(dfs[0], 'unit', value=['C'])
-        dfs[0] = dfs[0].drop(columns=['unit'])
+        # dfs[0] = filter_df(dfs[0], 'unit', value=['C'])
 
-        # Remove 'field' column (Only contains one unique value)
-        dfs[1] = dfs[1].drop(columns=['field'])
+        # Drop unnecessary columns
+        dfs[1] = dfs[1].drop(columns=['field', 'id_trx_status'])
+        dfs[0] = dfs[0].drop(columns=['unit', 'id_field_values', 'id_ftp'])
 
     if merge:
         for d in dfs:
@@ -119,6 +122,51 @@ def load_datasets(base_path: str = script_config.default_path,
         return df_merged
 
     return dfs
+
+
+def df_pivot_get(
+    df: DataFrame,
+    column: str,
+    value: str,
+    index: list[str] | None = None
+) -> DataFrame:
+    """
+    Returns the dataframe reshaped as a pivot table, setting whatever is provided as parameter
+    'column' as columns and placing parameter value 'values' as values. Default behavior is to
+    reshape the dataframe as a pivot table for each sensor
+
+    Args:
+        df: Target dataframe
+        column: The new column header
+        value: Value to fill the matrix for the corresponding 'column' for each row
+        index: Specifies which columns to keep as index (to be retained in the dataframe)
+
+    Returns:
+        A dataframe where each 'column' is a column and 'values' placed accordingly
+    """
+    if index is None:
+        index = ['customer', 'id_audit', 'serial', 'branch_header']
+
+    return df.pivot(index=index, columns=column, values=value)
+
+
+def filter_count_std_95(df: DataFrame | pd.Series,
+                  axis: int = 0) -> DataFrame:
+    """
+    Filter dataframe to keep only the columns with a count above 2 STDs (I.e,
+    remove the values that fall outside 95%)
+    Args:
+        df: Target dataframe
+        axis: Target axis in dataframe
+    Returns:
+        The filtered dataframe
+    """
+    readings_per_column: pd.Series = df.count()
+    mean_r: int = readings_per_column.mean()
+    std_r: int = readings_per_column.std()
+    region_95: tuple[int, int] = ((mean_r - 2 * std_r), (mean_r + 2 * std_r))
+    return df.dropna(axis=axis, thresh=region_95[0])
+
 
 
 def remove_outliers_range(
