@@ -86,7 +86,7 @@ def load_datasets(base_path: str = script_config.default_path,
                   clean: bool = False,
                   merge: bool = False,
                   concat: bool = False,
-                  label_encode: list['str'] | None = None,
+                  label_encode: list[str] | None = None,
                   replace_encode: bool = False,
                   sample_size: float | None = None
 ) -> list[DataFrame] | DataFrame:
