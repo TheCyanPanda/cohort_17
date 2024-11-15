@@ -6,6 +6,11 @@ import json
 import os
 from dataclasses import dataclass, field
 import numpy as np
+from sklearn.preprocessing import LabelEncoder
+
+
+class MutualExclusivityError(Exception):
+    pass
 
 
 @dataclass
@@ -80,6 +85,10 @@ def load_datasets(base_path: str = script_config.default_path,
                   script_config_: ScriptConfig = script_config,
                   clean: bool = False,
                   merge: bool = False,
+                  concat: bool = False,
+                  label_encode: list['str'] | None = None,
+                  replace_encode: bool = False,
+                  sample_size: float | None = None
 ) -> list[DataFrame] | DataFrame:
     """
     Loads the datasets given by the configuration
@@ -87,14 +96,33 @@ def load_datasets(base_path: str = script_config.default_path,
         base_path: path to datasets
         script_config_: ScriptConfig object
         clean: Cleans up the data if True
+        merge: Merges the datasets into one using ´combine_first´ if True
+        concat: Concatenates the datasets into one if True
+        sample_size: Select a fraction of the dataset to be loaded
+        label_encode: Label encode provided columns
+        replace_encode: Replace non-encoded columns with teh encoded columns
     Returns:
         A list containing the three loaded datasets if 'merge' is False, else a single DataFrame
         containing the merged data
     """
+    if concat and merge:
+        raise MutualExclusivityError("Select either merge or concat. Both option cannot be True")
+
     dfs: list[DataFrame] = []
     for df in script_config_.dataset_file_names:
         _df: DataFrame = pd.read_csv(f"{base_path}/{df}", delimiter=";")
+        if sample_size is not None:
+            _df = _df.sample(frac=sample_size)
         dfs.append(_df)
+
+    # Label encoding
+    if label_encode:
+        label_encoder = LabelEncoder()
+        for i, d in enumerate(dfs):
+            for label in label_encode:
+                if label in d:
+                    new_label = f"{label}_le" if not replace_encode else label
+                    dfs[i][new_label] = label_encoder.fit_transform(dfs[i][label])
 
     if clean:
         # Clean up column names
@@ -118,8 +146,11 @@ def load_datasets(base_path: str = script_config.default_path,
     if merge:
         for d in dfs:
             d.set_index('id_audit')
-        df_merged: DataFrame = dfs[0].combine_first(dfs[1]).combine_first(dfs[2])
-        return df_merged
+        df: DataFrame = dfs[0].combine_first(dfs[1]).combine_first(dfs[2])
+        return df
+    if concat:
+        df: DataFrame = pd.concat(dfs)
+        return df
 
     return dfs
 
@@ -151,7 +182,8 @@ def df_pivot_get(
 
 
 def filter_count_std_95(df: DataFrame | pd.Series,
-                  axis: int = 0) -> DataFrame:
+                        axis: int = 0,
+                        column: str | None = None) -> DataFrame:
     """
     Filter dataframe to keep only the columns with a count above 2 STDs (I.e,
     remove the values that fall outside 95%)
@@ -161,6 +193,8 @@ def filter_count_std_95(df: DataFrame | pd.Series,
     Returns:
         The filtered dataframe
     """
+    if column is not None:
+        df = df[column]
     readings_per_column: pd.Series = df.count()
     mean_r: int = readings_per_column.mean()
     std_r: int = readings_per_column.std()
