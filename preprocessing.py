@@ -124,3 +124,26 @@ def tranpose_dataframe(df: pd.DataFrame,
     result_df = pd.concat(pivoted_dfs, axis=1)
     
     return result_df.reset_index()
+
+def clean_datasets(dfs: tuple[pd.DataFrame]) -> None:
+    """
+    Cleans the dataset in place.
+    """
+    drop_irrelevant_columns(dfs[0], dfs[1])
+    drop_illegal_temp_values(dfs[0])
+    split_power_class(dfs[1])
+    extract_sensor_label_full(dfs[0])
+    extract_branch_header(dfs[1])
+
+def merge_datasets(dfs: tuple[pd.DataFrame]) -> pd.DataFrame:
+    """
+    Returns the merged dataset where sensors/temperature and branch/power as been transformed into separate columns
+    """
+    df_temp_transposed = tranpose_dataframe(dfs[0], key_column='sensor_label',
+                                               value_columns=['temp_value'])
+    df_power_transposed = tranpose_dataframe(dfs[1], key_column='branch_header',
+                                                value_columns=['watts', 'dbm'],
+                                                suffixes={'watts': 'watts', 'dbm': 'dbm'})
+    df = pd.merge(dfs[2], df_temp_transposed)
+    df = pd.merge(df, df_power_transposed)
+    return df
