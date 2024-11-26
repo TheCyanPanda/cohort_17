@@ -80,13 +80,13 @@ class ScriptConfig:
 # Create an instance of the ScriptConfig class
 script_config = ScriptConfig()
 
-
 def load_datasets(base_path: str = script_config.default_path,
                   script_config_: ScriptConfig = script_config,
                   clean: bool = False,
                   merge: bool = False,
+                  merge_how: str = 'combine',
                   concat: bool = False,
-                  label_encode: list[str] | None = None,
+                  label_encode: list['str'] | None = None,
                   replace_encode: bool = False,
                   sample_size: float | None = None
 ) -> list[DataFrame] | DataFrame:
@@ -96,7 +96,8 @@ def load_datasets(base_path: str = script_config.default_path,
         base_path: path to datasets
         script_config_: ScriptConfig object
         clean: Cleans up the data if True
-        merge: Merges the datasets into one using ´combine_first´ if True
+        merge: Merges the datasets into one using 'pandas.merge' if True
+        merge_how: How to merge if merge is True
         concat: Concatenates the datasets into one if True
         sample_size: Select a fraction of the dataset to be loaded
         label_encode: Label encode provided columns
@@ -144,9 +145,15 @@ def load_datasets(base_path: str = script_config.default_path,
         dfs[0] = dfs[0].drop(columns=['unit', 'id_field_values', 'id_ftp'])
 
     if merge:
-        for d in dfs:
-            d.set_index('id_audit')
-        df: DataFrame = dfs[0].combine_first(dfs[1]).combine_first(dfs[2])
+        # df: DataFrame
+        if merge_how.lower() == 'combine':
+            for d in dfs:
+                d.set_index('id_audit')
+            df = dfs[0].combine_first(dfs[1]).combine_first(dfs[2])
+            #df['serial'] = df['serial'].fillna(-1)
+        else:
+            df = pd.merge(dfs[0], dfs[1], on='id_audit', how=merge_how, suffixes=('_df0', '_df1'))
+            df = pd.merge(df, dfs[2], on='id_audit', how=merge_how, suffixes=('', '_df2'))
         return df
     if concat:
         df: DataFrame = pd.concat(dfs)
@@ -200,8 +207,6 @@ def filter_count_std_95(df: DataFrame | pd.Series,
     std_r: int = readings_per_column.std()
     region_95: tuple[int, int] = ((mean_r - 2 * std_r), (mean_r + 2 * std_r))
     return df.dropna(axis=axis, thresh=region_95[0])
-
-
 
 def remove_outliers_range(
     df: pd.DataFrame,
