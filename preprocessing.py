@@ -1,8 +1,6 @@
 from __future__ import annotations
 import os
 import pandas as pd
-from pandarallel import pandarallel
-pandarallel.initialize(nb_workers=os.cpu_count()-1)
 
 
 def load_dataset():
@@ -95,7 +93,7 @@ def transposePower(df):
     return x
 
 def tranpose_dataframe(df: pd.DataFrame,
-                       key_column: str,
+                       key_column: str | list[str],
                        value_columns: list[str],
                        suffixes: dict[str, str] | None = None,
                        group_column: str = 'id_audit'
